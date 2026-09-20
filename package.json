@@ -1,0 +1,20 @@
+{
+  "name": "bff-petly",
+  "version": "1.0.0",
+  "description": "Backend for Frontend para Petly en Node.js",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "node --watch src/app.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-jwt-verify": "^5.2.1",
+    "axios": "^1.20.0",
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
+  }
+}
