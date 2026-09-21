@@ -39,16 +39,21 @@ export const obtenerDetalleProducto = async (idProducto) => {
       const resCategoria = await axios.get(`${MS_CATALOGO_URL}/${producto.idCategoria}`);
       nombreCategoria = resCategoria.data.nombreCategoria;
     } catch (error) {
-      console.warn(`No se pudo obtener la categoría ${producto.idCategoria}:${error.message}`);
+      console.warn(`No se pudo obtener la categoría ${producto.idCategoria}: ${error.message}`);
     }
   }
 
   return {
-    idProducto: producto.idProducto,
+    ...producto,
+    idProducto: producto.idProducto || producto.id,
     nombreProducto: producto.nombreProducto,
     precio: producto.precio,
     stock: producto.stock,
     urlImagen: producto.urlImagen,
+    descripcion: producto.descripcion || "Sin descripción",
+    idEspecie: producto.idEspecie || 1,
+    idMarca: producto.idMarca || 1,
+    idCategoria: producto.idCategoria || 1,
     categoria: nombreCategoria
   };
 };
