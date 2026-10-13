@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { 
-  postPedido, 
+  postPedido,
+  confirmarPago,
   getPedidosPorUsuario, 
   getPedidoPorId 
 } from '../controllers/pedido.controller.js';
@@ -8,6 +9,7 @@ import {
 const router = Router();
 
 router.post('/', postPedido);
+router.post('/confirmar-pago',confirmarPago);
 router.get('/usuario/:idUsuario', getPedidosPorUsuario);
 router.get('/:id', getPedidoPorId);
 

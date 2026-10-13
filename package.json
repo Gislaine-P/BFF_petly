@@ -15,6 +15,7 @@
     "aws-jwt-verify": "^5.2.1",
     "axios": "^1.20.0",
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "transbank-sdk": "^6.1.1"
   }
 }

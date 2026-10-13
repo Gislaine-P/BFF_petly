@@ -1,5 +1,6 @@
 import {
     crearPedido,
+    confirmarPagoWebpay,
     obtenerPedidosPorUsuario,
     obtenerPedidoPorId
 } from '../services/pedido.service.js';
@@ -10,6 +11,15 @@ export const postPedido = async (req, res) => {
         res.status(201).json(nuevoPedido);
     } catch (error) {
         res.status(500).json({ mensaje: 'Error al procesar el pedido', error: error.message });
+    }
+};
+export const confirmarPago = async (req, res) => {
+    try {
+        const { token } = req.body;
+        const resultado = await confirmarPagoWebpay(token);
+        res.json(resultado);
+    } catch (error) {
+        res.status(500).json({ mensaje: 'Error al confirmar la transacción de Webpay', error: error.message });
     }
 };
 

@@ -1,36 +1,77 @@
 //import fetch from'node-fetch';
 
-const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL||'http://localhost:8084/api/pedidos';
+import { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } from 'transbank-sdk';
 
-export const crearPedido = async(datosPedido) =>{
-    const response = await fetch(MS_PEDIDOS_URL,{
-        method:'POST',
-        headers:{'Content-Type': 'application/json'},
-        body:JSON.stringify(datosPedido),
-    });
+const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://localhost:8084/api/pedidos';
 
-    if(!response.ok){
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody.message || errorBody.error ||'Error al crear el pedido en ms-pedidos');
-        
-    }
-    return await response.json();
+export const actualizarEstadoPedido = async (idPedido, estado) => {
+  const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}/estado?estado=${estado}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  if (!response.ok) {
+    throw new Error('Error al actualizar el estado del pedido en ms-pedidos');
+  }
+
+  return await response.json();
 };
 
-export const obtenerPedidosPorUsuario = async (idUsuario) => {
-    const response = await fetch(`${MS_PEDIDOS_URL}/usuario/${idUsuario}`);
+export const crearPedido = async (datosPedido) => {
+  
+  const payload = {
+    ...datosPedido,
+    estado: datosPedido.metodoPago === 'WEBPAY' ? 'PENDIENTE' : 'PAGADO'
+  };
 
-    if(!response.ok){
-        throw new Error('Error al obtener los pedidos del usuario');
-    }
-    return await response.json();
+  const response = await fetch(MS_PEDIDOS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(errorBody.message || errorBody.error || 'Error al crear el pedido en ms-pedidos');
+  }
+
+  const pedidoGuardado = await response.json();
+
+  if (datosPedido.metodoPago === 'WEBPAY') {
+    const tx = new WebpayPlus.Transaction(
+      new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
+    );
+
+    const buyOrder = `ORD-${pedidoGuardado.idPedido}`;
+    const sessionId = `SESS-${datosPedido.idUsuario}`;
+    const amount = pedidoGuardado.montoTotal;
+    const returnUrl = 'http://localhost:5173/checkout/confirmacion'; 
+
+    const responseWebpay = await tx.create(buyOrder, sessionId, amount, returnUrl);
+
+    return {
+      ...pedidoGuardado,
+      urlWebpay: responseWebpay.url,
+      tokenWebpay: responseWebpay.token,
+    };
+  }
+
+  return pedidoGuardado;
 };
 
-export const obtenerPedidoPorId = async(idPedido) => {
-    const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}`);
+export const confirmarPagoWebpay = async (token, idPedido) => {
+  const tx = new WebpayPlus.Transaction(
+    new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
+  );
 
-    if(!response.ok){
-        throw new Error('Error al obtener el detalle del pedido');
-    }
-    return await response.json();
+  const responseCommit = await tx.commit(token);
+
+  
+  if (responseCommit.response_code === 0) {
+    await actualizarEstadoPedido(idPedido, 'PAGADO');
+  } else {
+    await actualizarEstadoPedido(idPedido, 'RECHAZADO');
+  }
+
+  return responseCommit;
 };
