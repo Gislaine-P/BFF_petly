@@ -3,6 +3,7 @@ import cors from 'cors';
 import productoRoutes from './routes/producto.routes.js';
 import categoriaRoutes from './routes/categoria.routes.js';
 import marcaRoutes from './routes/marca.routes.js';
+import pedidoRoutes from './routes/pedido.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 8083;
@@ -13,8 +14,9 @@ app.use(express.json());
 
 // Registro de rutas
 app.use('/productos', productoRoutes);
-app.use('/categorias', categoriaRoutes); 
+app.use('/categorias', categoriaRoutes);
 app.use('/marcas', marcaRoutes);
+app.use('/pedidos', pedidoRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 BFF Servidor corriendo en http://localhost:${PORT}`);
