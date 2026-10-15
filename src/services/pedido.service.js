@@ -1,8 +1,28 @@
-//import fetch from'node-fetch';
+import transbank from 'transbank-sdk';
 
-import { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } from 'transbank-sdk';
+const { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } = transbank;
+const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://localhost:8084/api/pedidos';//configuracion local que despues hay que cambiarlo
+const WEBPAY_RETURN_URL = process.env.WEBPAY_RETURN_URL || 'http://localhost:5173/ConfirmacionPago';//configuracion local que despues hay que cambiarlo 
 
-const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://localhost:8084/api/pedidos';
+export const obtenerPedidoPorId = async (idPedido) => {
+  const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}`);
+
+  if (!response.ok) {
+    throw new Error('Error al obtener el pedido desde ms-pedidos');
+  }
+
+  return await response.json();
+};
+
+export const obtenerPedidosPorUsuario = async (idUsuario) => {
+  const response = await fetch(`${MS_PEDIDOS_URL}/usuario/${idUsuario}`);
+
+  if (!response.ok) {
+    throw new Error('Error al obtener los pedidos del usuario desde ms-pedidos');
+  }
+
+  return await response.json();
+};
 
 export const actualizarEstadoPedido = async (idPedido, estado) => {
   const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}/estado?estado=${estado}`, {
@@ -18,10 +38,9 @@ export const actualizarEstadoPedido = async (idPedido, estado) => {
 };
 
 export const crearPedido = async (datosPedido) => {
-  
   const payload = {
     ...datosPedido,
-    estado: datosPedido.metodoPago === 'WEBPAY' ? 'PENDIENTE' : 'PAGADO'
+    estado: datosPedido.metodoPago === 'WEBPAY' ? 'PENDIENTE_PAGO' : 'PAGADO'
   };
 
   const response = await fetch(MS_PEDIDOS_URL, {
@@ -37,6 +56,10 @@ export const crearPedido = async (datosPedido) => {
 
   const pedidoGuardado = await response.json();
 
+  if (pedidoGuardado.estado === 'PENDIENTE_VALIDACION_SAG') {
+    return pedidoGuardado;
+  }
+
   if (datosPedido.metodoPago === 'WEBPAY') {
     const tx = new WebpayPlus.Transaction(
       new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
@@ -45,9 +68,9 @@ export const crearPedido = async (datosPedido) => {
     const buyOrder = `ORD-${pedidoGuardado.idPedido}`;
     const sessionId = `SESS-${datosPedido.idUsuario}`;
     const amount = pedidoGuardado.montoTotal;
-    const returnUrl = 'http://localhost:5173/checkout/confirmacion'; 
 
-    const responseWebpay = await tx.create(buyOrder, sessionId, amount, returnUrl);
+    // Se utiliza la constante WEBPAY_RETURN_URL definida arriba
+    const responseWebpay = await tx.create(buyOrder, sessionId, amount, WEBPAY_RETURN_URL);
 
     return {
       ...pedidoGuardado,
@@ -66,7 +89,6 @@ export const confirmarPagoWebpay = async (token, idPedido) => {
 
   const responseCommit = await tx.commit(token);
 
-  
   if (responseCommit.response_code === 0) {
     await actualizarEstadoPedido(idPedido, 'PAGADO');
   } else {
