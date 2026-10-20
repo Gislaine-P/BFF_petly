@@ -1,6 +1,5 @@
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 
-// Configuración del verificador con las salidas de tu Terraform
 const verifier = CognitoJwtVerifier.create({
   userPoolId: "us-east-1_tMEJHUj2k",
   tokenUse: "access",

@@ -1,8 +1,8 @@
 import transbank from 'transbank-sdk';
 
 const { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } = transbank;
-const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://localhost:8084/api/pedidos';//configuracion local que despues hay que cambiarlo
-const WEBPAY_RETURN_URL = process.env.WEBPAY_RETURN_URL || 'http://localhost:5173/ConfirmacionPago';//configuracion local que despues hay que cambiarlo 
+const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://10.0.133.67:8084/api/pedido';
+const WEBPAY_RETURN_URL = process.env.WEBPAY_RETURN_URL || 'http://3-222-252-115.sslip.io/ConfirmacionPago';
 
 export const obtenerPedidoPorId = async (idPedido) => {
   const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}`);

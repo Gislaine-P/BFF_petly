@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const MS_PRODUCTO_URL = process.env.MS_PRODUCTO_URL || 'http://10.0.141.120:8081/api/producto';
+const MS_PRODUCTO_URL = process.env.MS_PRODUCTO_URL || 'http://localhost:8081/api/producto';
 const MS_CATALOGO_URL = process.env.MS_CATALOGO_URL || 'http://10.0.131.3:8082/api/categoria';
 
 export const obtenerProductos = async (categoriaId) => {
