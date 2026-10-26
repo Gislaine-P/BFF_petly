@@ -1,99 +1,70 @@
-import transbank from 'transbank-sdk';
+import axios from 'axios';
+import { WebpayPlus } from 'transbank-sdk';
 
-const { WebpayPlus, Options, IntegrationCommerceCodes, IntegrationApiKeys, Environment } = transbank;
-const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://10.0.133.67:8084/api/pedido';
-const WEBPAY_RETURN_URL = process.env.WEBPAY_RETURN_URL || 'http://3-222-252-115.sslip.io/ConfirmacionPago';
+const MS_PEDIDOS_URL = process.env.MS_PEDIDOS_URL || 'http://10.0.133.67:8084/api/pedidos';
 
-export const obtenerPedidoPorId = async (idPedido) => {
-  const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}`);
+export const crearPedidoYIniciarPago = async (datosPedido) => {
+  // 1. Guardar el pedido de forma interna en el microservicio Java
+  const pedidoResponse = await axios.post(MS_PEDIDOS_URL, datosPedido);
+  const pedidoCreado = pedidoResponse.data;
 
-  if (!response.ok) {
-    throw new Error('Error al obtener el pedido desde ms-pedidos');
+  // Si no es Webpay, simplemente retornamos el pedido (Ej: efectivo/transferencia)
+  if (datosPedido.metodoPago !== 'WEBPAY') {
+    return pedidoCreado;
   }
 
-  return await response.json();
-};
+  // 2. Conectar a Transbank usando el SDK oficial
+  const returnUrl = process.env.WEBPAY_RETURN_URL || 'https://3-222-252-115.sslip.io/api/pedidos/retorno-webpay';
+  const buyOrder = pedidoCreado.idPedido.toString();
+  const sessionId = `sesion_${pedidoCreado.idUsuario}`;
+  const amount = pedidoCreado.montoTotal;
 
-export const obtenerPedidosPorUsuario = async (idUsuario) => {
-  const response = await fetch(`${MS_PEDIDOS_URL}/usuario/${idUsuario}`);
-
-  if (!response.ok) {
-    throw new Error('Error al obtener los pedidos del usuario desde ms-pedidos');
-  }
-
-  return await response.json();
-};
-
-export const actualizarEstadoPedido = async (idPedido, estado) => {
-  const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}/estado?estado=${estado}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-  });
-
-  if (!response.ok) {
-    throw new Error('Error al actualizar el estado del pedido en ms-pedidos');
-  }
-
-  return await response.json();
-};
-
-export const crearPedido = async (datosPedido) => {
-  const payload = {
-    ...datosPedido,
-    estado: datosPedido.metodoPago === 'WEBPAY' ? 'PENDIENTE_PAGO' : 'PAGADO'
-  };
-
-  const response = await fetch(MS_PEDIDOS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new Error(errorBody.message || errorBody.error || 'Error al crear el pedido en ms-pedidos');
-  }
-
-  const pedidoGuardado = await response.json();
-
-  if (pedidoGuardado.estado === 'PENDIENTE_VALIDACION_SAG') {
-    return pedidoGuardado;
-  }
-
-  if (datosPedido.metodoPago === 'WEBPAY') {
-    const tx = new WebpayPlus.Transaction(
-      new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
+  try {
+    // El SDK maneja automáticamente la petición HTTP y las credenciales de integración
+    const transbankResponse = await WebpayPlus.Transaction.create(
+      buyOrder,
+      sessionId,
+      amount,
+      returnUrl
     );
 
-    const buyOrder = `ORD-${pedidoGuardado.idPedido}`;
-    const sessionId = `SESS-${datosPedido.idUsuario}`;
-    const amount = pedidoGuardado.montoTotal;
-
-    // Se utiliza la constante WEBPAY_RETURN_URL definida arriba
-    const responseWebpay = await tx.create(buyOrder, sessionId, amount, WEBPAY_RETURN_URL);
-
+    // 3. Devolver datos al frontend
     return {
-      ...pedidoGuardado,
-      urlWebpay: responseWebpay.url,
-      tokenWebpay: responseWebpay.token,
+      ...pedidoCreado,
+      token_ws: transbankResponse.token,
+      url_pago: transbankResponse.url
     };
+  } catch (error) {
+    console.error('Error SDK Transbank (Crear):', error);
+    throw new Error('No se pudo iniciar el pago con la pasarela.');
   }
-
-  return pedidoGuardado;
 };
 
 export const confirmarPagoWebpay = async (token, idPedido) => {
-  const tx = new WebpayPlus.Transaction(
-    new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
-  );
+  try {
+    // 1. El BFF confirma el pago directamente con el SDK de Transbank
+    const txData = await WebpayPlus.Transaction.commit(token);
 
-  const responseCommit = await tx.commit(token);
-
-  if (responseCommit.response_code === 0) {
-    await actualizarEstadoPedido(idPedido, 'PAGADO');
-  } else {
-    await actualizarEstadoPedido(idPedido, 'RECHAZADO');
+    // 2. Avisamos al microservicio Java (red interna) para que actualice el estado
+    if (txData.response_code === 0 && txData.status === 'AUTHORIZED') {
+      await axios.patch(`${MS_PEDIDOS_URL}/${idPedido}/estado?estado=PAGADO`);
+      return { exito: true, transaccion: txData };
+    } else {
+      await axios.patch(`${MS_PEDIDOS_URL}/${idPedido}/estado?estado=CANCELADO`); 
+      return { exito: false, transaccion: txData };
+    }
+  } catch (error) {
+    console.error('Error SDK Transbank (Confirmar):', error);
+    throw new Error('Error al confirmar el pago');
   }
+};
 
-  return responseCommit;
+export const obtenerPedidosPorUsuario = async (idUsuario) => {
+  const response = await axios.get(`${MS_PEDIDOS_URL}/usuario/${idUsuario}`);
+  return response.data;
+};
+
+export const obtenerPedidoPorId = async (id) => {
+  const response = await axios.get(`${MS_PEDIDOS_URL}/${id}`);
+  return response.data;
 };

@@ -1,44 +1,67 @@
-import {
-    crearPedido,
-    confirmarPagoWebpay,
-    obtenerPedidosPorUsuario,
-    obtenerPedidoPorId
-} from '../services/pedido.service.js';
+import * as pedidoService from '../services/pedido.service.js';
 
-export const postPedido = async (req, res) => {
+export const postPedido = async (req, res, next) => {
     try {
-        const nuevoPedido = await crearPedido(req.body);
-        res.status(201).json(nuevoPedido);
+        const idUsuario = req.user?.sub || req.user?.id || req.body.idUsuario;
+        const datosPedido = {
+            ...req.body,
+            idUsuario
+        };
+
+        const resultado = await pedidoService.crearPedidoYIniciarPago(datosPedido);
+        return res.status(201).json(resultado);
     } catch (error) {
-        res.status(500).json({ mensaje: 'Error al procesar el pedido', error: error.message });
-    }
-};
-export const confirmarPago = async (req, res) => {
-    try {
-        const { token } = req.body;
-        const resultado = await confirmarPagoWebpay(token);
-        res.json(resultado);
-    } catch (error) {
-        res.status(500).json({ mensaje: 'Error al confirmar la transacción de Webpay', error: error.message });
+        next(error);
     }
 };
 
-export const getPedidosPorUsuario = async (req, res) => {
+export const confirmarPago = async (req, res, next) => {
+    try {
+        const { token_ws, token, idPedido } = req.body;
+        const tokenFinal = token_ws || token;
+
+        if (!tokenFinal) {
+            return res.status(400).json({ message: 'El token de Webpay es requerido' });
+        }
+
+        const resultado = await pedidoService.confirmarPagoWebpay(tokenFinal, idPedido);
+        return res.status(200).json(resultado);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Controlador para el retorno automático desde Transbank Webpay
+export const retornoWebpay = (req, res) => {
+    // Unifica datos recibidos por POST (req.body) o GET (req.query)
+    const datos = { ...req.query, ...req.body };
+    const FRONT = process.env.FRONTEND_URL || 'https://3-222-252-115.sslip.io';
+
+    // Si la transacción fue cancelada o abortada en la pasarela, Webpay envía TBK_TOKEN
+    if (datos.TBK_TOKEN || !datos.token_ws) {
+        return res.redirect(303, `${FRONT}/ConfirmacionPago?cancelado=1`);
+    }
+
+    // Redirección exitosa vía GET a React enviando el token_ws en la URL
+    return res.redirect(303, `${FRONT}/ConfirmacionPago?token_ws=${encodeURIComponent(datos.token_ws)}`);
+};
+
+export const getPedidosPorUsuario = async (req, res, next) => {
     try {
         const { idUsuario } = req.params;
-        const pedidos = await obtenerPedidosPorUsuario(idUsuario);
-        res.json(pedidos);
+        const pedidos = await pedidoService.obtenerPedidosPorUsuario(idUsuario);
+        return res.status(200).json(pedidos);
     } catch (error) {
-        res.status(500).json({ mensaje: 'Error al consultar historial de pedidos', error: error.message });
+        next(error);
     }
 };
 
-export const getPedidoPorId = async (req, res) => {
+export const getPedidoPorId = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const pedido = await obtenerPedidoPorId(id);
-        res.json(pedido);
+        const pedido = await pedidoService.obtenerPedidoPorId(id);
+        return res.status(200).json(pedido);
     } catch (error) {
-        res.status(500).json({ mensaje: 'Error al consultar el detalle del pedido', error: error.message });
+        next(error);
     }
 };

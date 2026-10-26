@@ -10,11 +10,14 @@ import sqsAdminRoutes from './routes/sqsAdmin.routes.js';
 const app = express();
 const PORT = process.env.PORT || 8083;
 
-// Middleware de CORS global (maneja internamente los preflights OPTIONS)
+// Middleware de CORS global
 app.use(cors());
-app.use(express.json());
 
-// Registro de rutas
+// Middlewares para procesar el cuerpo de las peticiones
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Rutas limpias (porque API Gateway ya removió el /api/bff)
 app.use('/productos', productoRoutes);
 app.use('/categorias', categoriaRoutes);
 app.use('/marcas', marcaRoutes);
