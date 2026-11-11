@@ -3,8 +3,13 @@ import axios from 'axios';
 const MS_CATALOGO_URL = process.env.MS_CATALOGO_URL || 'http://10.0.131.3:8082/api/categoria';
 
 export const obtenerCategorias = async () => {
-  const response = await axios.get(MS_CATALOGO_URL);
-  return response.data;
+  try {
+    const response = await axios.get(MS_CATALOGO_URL);
+    return response.data;
+  } catch (error) {
+    console.error(`[BFF Error] Falló llamada a ${MS_CATALOGO_URL}:`, error.response?.status || error.message);
+    throw error;
+  }
 };
 
 export const crearCategoria = async (nuevaCategoria) => {

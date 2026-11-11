@@ -1,27 +1,18 @@
-const { Router } = require('express');
-const { 
-  postPedido, 
-  confirmarPago, 
+import { Router } from 'express';
+import { 
+  postPedido,
+  confirmarPago,
+  retornoWebpay,
   getPedidosPorUsuario, 
-  getPedidoPorId, 
-  retornoWebpay 
-} = require('../controllers/pedido.controller.js');
-const { authenticateToken } = require('../middlewares/auth.middleware.js');
+  getPedidoPorId 
+} from '../controllers/pedido.controller.js';
 
 const router = Router();
 
-// Endpoint invocado desde el Checkout del frontend
-router.post('/iniciar-pago', authenticateToken, postPedido);
-router.post('/', postPedido); // Mantener por compatibilidad
-
-// Confirmación de pago desde Webpay
-router.post('/confirmar-pago', confirmarPago);
-
-// Retorno desde Webpay (Acepta GET y POST sin middleware de autenticación)
-router.all('/retorno-webpay', retornoWebpay);
-
-// Consultas
+router.post('/', postPedido);
+router.post('/confirmar-pago',confirmarPago);
+router.post('/retorno-webpay', retornoWebpay);
 router.get('/usuario/:idUsuario', getPedidosPorUsuario);
-router.get('/id', getPedidoPorId);
+router.get('/:id', getPedidoPorId);
 
-module.exports = router;
+export default router;

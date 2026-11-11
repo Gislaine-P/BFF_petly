@@ -17,13 +17,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rutas limpias (porque API Gateway ya removió el /api/bff)
-app.use('/productos', productoRoutes);
-app.use('/categorias', categoriaRoutes);
-app.use('/marcas', marcaRoutes);
-app.use('/pedidos', pedidoRoutes);
+// Rutas con el prefijo completo que ahora envía API Gateway
+app.use('/api/bff/categorias', categoriaRoutes);
+app.use('/api/bff/productos', productoRoutes);
+app.use('/api/bff/marcas', marcaRoutes);
+app.use('/api/bff/pedidos', pedidoRoutes);
 app.use('/admin/queues', sqsAdminRoutes);
-
 app.listen(PORT, () => {
   console.log(`🚀 BFF Servidor corriendo en el puerto ${PORT}`);
 });
