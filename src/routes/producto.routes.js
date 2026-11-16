@@ -7,7 +7,8 @@ import {
   postProducto, 
   putProducto, 
   deleteProducto,
-  descontarStock 
+  descontarStock,
+  aprobarSag 
 } from "../controllers/producto.controller.js";
 
 const router = Router();
@@ -16,10 +17,13 @@ const router = Router();
 router.get("/", getProductos);
 router.get("/:id/detalle", getProductoDetalle);
 
-
+// Descontar stock (llamado tras confirmar el pago en ConfirmacionPago.jsx)
 router.put("/:id/descontar-stock", authenticateToken, descontarStock);
 
-// CRUD de Gestion (solo admin)
+// Aprobación SAG por parte del Administrador (llamado desde DashboardAdmin.jsx)
+router.patch("/:id/aprobar-sag", authenticateToken, requireRole("admin"), aprobarSag);
+
+// CRUD de Gestión (solo admin)
 router.post("/", authenticateToken, requireRole("admin"), postProducto);
 router.put("/:id", authenticateToken, requireRole("admin"), putProducto);
 router.delete("/:id", authenticateToken, requireRole("admin"), deleteProducto);

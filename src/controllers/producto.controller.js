@@ -58,16 +58,20 @@ export const getProductoDetalle = async (req, res) => {
 export const descontarStock = async (req, res) => {
   try {
     const { id } = req.params;
-    
     const productoActual = await obtenerDetalleProducto(id);
 
     if (!productoActual) {
       return res.status(404).json({ mensaje: "Producto no encontrado" });
     }
 
+    // Soportamos tanto req.body.cantidad como req.body.cantidadVendida
+    const cantidadReducir = req.body.cantidad !== undefined 
+      ? req.body.cantidad 
+      : (req.body.cantidadVendida !== undefined ? req.body.cantidadVendida : 1);
+
     const stockActualizado = req.body.stock !== undefined 
       ? req.body.stock 
-      : Math.max(0, productoActual.stock - (req.body.cantidad || 1));
+      : Math.max(0, productoActual.stock - cantidadReducir);
 
     const payloadCompleto = {
       ...productoActual,
@@ -84,5 +88,29 @@ export const descontarStock = async (req, res) => {
   } catch (error) {
     console.error("Error en descontarStock:", error);
     res.status(500).json({ mensaje: 'Error al actualizar el stock', error: error.message });
+  }
+};
+
+export const aprobarSag = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const productoActual = await obtenerDetalleProducto(id);
+
+    if (!productoActual) {
+      return res.status(404).json({ mensaje: "Producto no encontrado" });
+    }
+
+    const payloadCompleto = {
+      ...productoActual,
+      ...req.body,
+      idProducto: parseInt(id, 10),
+      sagValidated: true
+    };
+
+    const productoEditado = await actualizarProducto(id, payloadCompleto);
+    res.json({ mensaje: "Validación SAG aprobada exitosamente", producto: productoEditado });
+  } catch (error) {
+    console.error("Error en aprobarSag:", error);
+    res.status(500).json({ mensaje: 'Error al aprobar la validación SAG', error: error.message });
   }
 };
