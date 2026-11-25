@@ -12,9 +12,35 @@ export const obtenerPedidoPorId = async (idPedido) => {
 };
 
 export const obtenerPedidosPorUsuario = async (idUsuario) => {
-  const response = await fetch(`${MS_PEDIDOS_URL}/usuario/${idUsuario}`);
+  const response = await fetch(`${MS_PEDIDOS_URL}/usuario/${encodeURIComponent(idUsuario)}`);
   if (!response.ok) throw new Error('Error al obtener los pedidos del usuario desde ms-pedidos');
   return await response.json();
+};
+
+export const obtenerPedidosPendientesSag = async () => {
+  const response = await fetch(`${MS_PEDIDOS_URL}/pendientes-sag`);
+  if (!response.ok) throw new Error('Error al obtener pedidos pendientes SAG desde ms-pedidos');
+  return await response.json();
+};
+
+export const aprobarValidacionSag = async (idPedido) => {
+  const response = await fetch(`${MS_PEDIDOS_URL}/${idPedido}/aprobar-sag`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Error al aprobar validación SAG del pedido en ms-pedidos');
+  return await response.json();
+};
+
+export const obtenerPedidoPendienteUsuario = async (idUsuario, idPedido = null) => {
+  const query = idPedido ? `?idPedido=${encodeURIComponent(idPedido)}` : '';
+  const response = await fetch(
+    `${MS_PEDIDOS_URL}/usuario/${encodeURIComponent(idUsuario)}/pendiente${query}`
+  );
+  if (response.status === 204 || response.status === 404) return null;
+  if (!response.ok) throw new Error('Error al consultar el pedido pendiente desde ms-pedidos');
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 };
 
 export const actualizarEstadoPedido = async (idPedido, estado) => {
@@ -26,8 +52,44 @@ export const actualizarEstadoPedido = async (idPedido, estado) => {
   return await response.json();
 };
 
+export const iniciarPagoPedidoExistente = async (idPedido) => {
+  const pedido = await obtenerPedidoPorId(idPedido);
+  const idPedidoReal = pedido.idPedido || pedido.id || idPedido;
+  const amount = Math.round(Number(pedido.montoTotal ?? pedido.monto ?? 0));
+
+  if (!amount || amount <= 0) {
+    throw new Error('El pedido no tiene un monto válido para iniciar el pago.');
+  }
+
+  const tx = new WebpayPlus.Transaction(
+    new Options(
+      IntegrationCommerceCodes.WEBPAY_PLUS,
+      IntegrationApiKeys.WEBPAY,
+      Environment.Integration
+    )
+  );
+
+  const buyOrder = `ORD-${idPedidoReal}`;
+  const sessionId = `SESS-${pedido.idUsuario || 'GUEST'}`;
+
+  const separator = WEBPAY_RETURN_URL.includes('?') ? '&' : '?';
+  const returnUrl = `${WEBPAY_RETURN_URL}${separator}idPedido=${encodeURIComponent(idPedidoReal)}`;
+
+  const responseWebpay = await tx.create(buyOrder, sessionId, amount, returnUrl);
+
+  return {
+    ...pedido,
+    idPedido: idPedidoReal,
+    url: responseWebpay.url,
+    token: responseWebpay.token,
+    urlWebpay: responseWebpay.url,
+    tokenWebpay: responseWebpay.token,
+  };
+};
+
 export const crearPedido = async (datosPedido) => {
-  const itemsList = datosPedido.items || datosPedido.detalles || datosPedido.productos || datosPedido.carrito;
+  const itemsList =
+    datosPedido.items || datosPedido.detalles || datosPedido.productos || datosPedido.carrito;
 
   const payload = {
     ...datosPedido,
@@ -35,10 +97,14 @@ export const crearPedido = async (datosPedido) => {
     productos: itemsList,
     detalles: itemsList,
     permisoSag: datosPedido.permisoSag || datosPedido.datosEnvio?.permisoSag || null,
-    estado: datosPedido.permisoSag ? 'PENDIENTE_VALIDACION_SAG' : (datosPedido.metodoPago === 'WEBPAY' ? 'PENDIENTE_PAGO' : 'PAGADO')
+    estado: datosPedido.permisoSag
+      ? 'PENDIENTE_VALIDACION_SAG'
+      : datosPedido.metodoPago === 'WEBPAY'
+      ? 'PENDIENTE_PAGO'
+      : 'PAGADO',
   };
 
-  console.log("===> Enviando a ms-pedidos:", JSON.stringify(payload, null, 2));
+  console.log('===> Enviando a ms-pedidos:', JSON.stringify(payload, null, 2));
 
   const response = await fetch(MS_PEDIDOS_URL, {
     method: 'POST',
@@ -63,18 +129,24 @@ export const crearPedido = async (datosPedido) => {
   if (pedidoGuardado.estado === 'PENDIENTE_VALIDACION_SAG') {
     return {
       ...pedidoGuardado,
-      mensaje: 'Pedido registrado con éxito. Pendiente de validación SAG.'
+      mensaje: 'Pedido registrado con éxito. Pendiente de validación SAG.',
     };
   }
 
   const tx = new WebpayPlus.Transaction(
-    new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
+    new Options(
+      IntegrationCommerceCodes.WEBPAY_PLUS,
+      IntegrationApiKeys.WEBPAY,
+      Environment.Integration
+    )
   );
 
   const idPedidoCreado = pedidoGuardado.idPedido || pedidoGuardado.id;
   const buyOrder = `ORD-${idPedidoCreado || Date.now()}`;
   const sessionId = `SESS-${datosPedido.idUsuario || 'GUEST'}`;
-  const amount = datosPedido.monto || datosPedido.montoTotal || pedidoGuardado.montoTotal || pedidoGuardado.monto;
+  const amount = Math.round(
+    Number(datosPedido.monto || datosPedido.montoTotal || pedidoGuardado.montoTotal || pedidoGuardado.monto)
+  );
 
   let returnUrl = WEBPAY_RETURN_URL;
   if (idPedidoCreado) {
@@ -95,7 +167,11 @@ export const crearPedido = async (datosPedido) => {
 
 export const confirmarPagoWebpay = async (token, idPedido) => {
   const tx = new WebpayPlus.Transaction(
-    new Options(IntegrationCommerceCodes.WEBPAY_PLUS, IntegrationApiKeys.WEBPAY, Environment.Integration)
+    new Options(
+      IntegrationCommerceCodes.WEBPAY_PLUS,
+      IntegrationApiKeys.WEBPAY,
+      Environment.Integration
+    )
   );
 
   const responseCommit = await tx.commit(token);
@@ -109,7 +185,9 @@ export const confirmarPagoWebpay = async (token, idPedido) => {
   }
 
   if (!idPedidoFinal) {
-    const error = new Error('El idPedido falta o no es un ID válido. No se pudo actualizar el estado del pedido.');
+    const error = new Error(
+      'El idPedido falta o no es un ID válido. No se pudo actualizar el estado del pedido.'
+    );
     error.status = 400;
     throw error;
   }
