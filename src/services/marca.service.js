@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const MS_MARCA_URL = process.env.MS_MARCA_URL || 'http://10.0.131.3:8082/api/marca';
+const MS_MARCA_URL = process.env.MS_MARCA_URL || 'http://ms-catalogo:8082/api/marca';
 
 export const obtenerMarcas = async () => {
   const response = await axios.get(MS_MARCA_URL);

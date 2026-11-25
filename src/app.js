@@ -23,6 +23,12 @@ app.use('/api/bff/productos', productoRoutes);
 app.use('/api/bff/marcas', marcaRoutes);
 app.use('/api/bff/pedidos', pedidoRoutes);
 app.use('/admin/queues', sqsAdminRoutes);
+
+app.use((err, req, res, next) => {
+  console.error('[BFF Error]:', err);
+  res.status(err.status || 500).json({ mensaje: err.message || 'Error interno en el BFF' });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 BFF Servidor corriendo en el puerto ${PORT}`);
 });

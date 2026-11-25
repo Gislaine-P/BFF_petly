@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { authenticateToken } from '../middlewares/auth.middleware.js';
 import { 
   postPedido,
   confirmarPago,
@@ -9,10 +10,11 @@ import {
 
 const router = Router();
 
-router.post('/', postPedido);
-router.post('/confirmar-pago',confirmarPago);
+router.post('/', authenticateToken, postPedido);
+router.post('/iniciar-pago', authenticateToken, postPedido);
+router.post('/confirmar-pago', authenticateToken, confirmarPago);
 router.post('/retorno-webpay', retornoWebpay);
-router.get('/usuario/:idUsuario', getPedidosPorUsuario);
-router.get('/:id', getPedidoPorId);
+router.get('/usuario/:idUsuario', authenticateToken, getPedidosPorUsuario);
+router.get('/:id', authenticateToken, getPedidoPorId);
 
 export default router;

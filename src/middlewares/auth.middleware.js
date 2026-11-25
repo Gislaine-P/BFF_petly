@@ -9,11 +9,14 @@ const verifier = CognitoJwtVerifier.create({
 export const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Acceso denegado: Token no proporcionado" });
     }
 
-    const token = authHeader.split(" ")[1];
+    const token = authHeader.slice(7).trim();
+    if (!token || token === "undefined" || token === "null") {
+      return res.status(401).json({ message: "Acceso denegado: Token inválido" });
+    }
 
     const payload = await verifier.verify(token);
 

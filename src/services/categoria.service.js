@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const MS_CATALOGO_URL = process.env.MS_CATALOGO_URL || 'http://10.0.131.3:8082/api/categoria';
+const MS_CATALOGO_URL = process.env.MS_CATALOGO_URL || 'http://ms-catalogo:8082/api/categoria';
 
 export const obtenerCategorias = async () => {
   try {

@@ -54,13 +54,7 @@ export const confirmarPago = async (req, res, next) => {
             });
         }
 
-        if (!idPedido) {
-            return res.status(400).json({
-                mensaje: 'El idPedido falta o no es un ID válido. No se confirmó la transacción.'
-            });
-        }
-
-        const resultado = await pedidoService.confirmarPagoWebpay(token, idPedido);
+        const resultado = await pedidoService.confirmarPagoWebpay(token, idPedido || null);
         return res.status(200).json(resultado);
     } catch (error) {
         console.error('Error al confirmar pago Webpay:', error.message || error);
@@ -70,13 +64,14 @@ export const confirmarPago = async (req, res, next) => {
 
 export const retornoWebpay = (req, res) => {
     const datos = { ...req.query, ...req.body };
-    const FRONT = process.env.FRONTEND_URL || 'https://3-222-252-115.sslip.io';
+    const FRONT = (process.env.FRONTEND_URL || 'https://3-222-252-115.sslip.io').replace(/\/$/, '');
+    const idPedidoParam = datos.idPedido ? `&idPedido=${encodeURIComponent(datos.idPedido)}` : '';
 
     if (datos.TBK_TOKEN || !datos.token_ws) {
-        return res.redirect(303, `${FRONT}/ConfirmacionPago?cancelado=1`);
+        return res.redirect(303, `${FRONT}/ConfirmacionPago?cancelado=1${idPedidoParam}`);
     }
 
-    return res.redirect(303, `${FRONT}/ConfirmacionPago?token_ws=${encodeURIComponent(datos.token_ws)}`);
+    return res.redirect(303, `${FRONT}/ConfirmacionPago?token_ws=${encodeURIComponent(datos.token_ws)}${idPedidoParam}`);
 };
 
 export const getPedidosPorUsuario = async (req, res, next) => {

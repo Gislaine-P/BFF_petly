@@ -78,8 +78,8 @@ export const descontarStock = async (req, res) => {
       ...req.body,
       idProducto: parseInt(id, 10),
       stock: stockActualizado,
-      idMarca: req.body.idMarca || productoActual.idMarca || 1,
-      idCategoria: req.body.idCategoria || productoActual.idCategoria || 1,
+      idMarca: req.body.idMarca ?? productoActual.idMarca ?? null,
+      idCategoria: req.body.idCategoria ?? productoActual.idCategoria ?? null,
       idEspecie: req.body.idEspecie || productoActual.idEspecie || 1
     };
 

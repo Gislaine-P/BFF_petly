@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const MS_PRODUCTO_URL = process.env.MS_PRODUCTO_URL || 'http://10.0.141.120:8081/api/producto';
-const MS_CATALOGO_URL = process.env.MS_CATALOGO_URL || 'http://10.0.131.3:8082/api/categoria';
+const MS_PRODUCTO_URL = process.env.MS_PRODUCTO_URL || 'http://ms-producto:8081/api/producto';
+const MS_CATALOGO_URL = process.env.MS_CATALOGO_URL || 'http://ms-catalogo:8082/api/categoria';
 
 export const obtenerProductos = async (categoriaId) => {
   let url = MS_PRODUCTO_URL;
@@ -52,8 +52,8 @@ export const obtenerDetalleProducto = async (idProducto) => {
     urlImagen: producto.urlImagen,
     descripcion: producto.descripcion || "Sin descripción",
     idEspecie: producto.idEspecie || 1,
-    idMarca: producto.idMarca || 1,
-    idCategoria: producto.idCategoria || 1,
+    idMarca: producto.idMarca ?? null,
+    idCategoria: producto.idCategoria ?? null,
     categoria: nombreCategoria
   };
 };
